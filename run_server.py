@@ -9,18 +9,19 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
-    # Get port from environment (for cloud deployment)
-    # Coolify and other platforms may set PORT to different values
-    # Use 3030 as default since 8001 may not be available on some platforms
-    port = int(os.getenv("PORT", 3030))
+    try:
+        # Get port from environment (for cloud deployment)
+        # Coolify and other platforms may set PORT to different values
+        # Use 3030 as default since 8001 may not be available on some platforms
+        port = int(os.getenv("PORT", 3030))
 
-    # Detect environment more reliably
-    environment = os.getenv("ENVIRONMENT", "production")  # Default to production
-    # Also check for common cloud environment indicators
-    if any(os.getenv(var) for var in ["RAILWAY_ENVIRONMENT", "RENDER", "HEROKU_APP_NAME", "COOLIFY_APP_ID"]):
-        environment = "production"
+        # Detect environment more reliably
+        environment = os.getenv("ENVIRONMENT", "production")  # Default to production
+        # Also check for common cloud environment indicators
+        if any(os.getenv(var) for var in ["RAILWAY_ENVIRONMENT", "RENDER", "HEROKU_APP_NAME", "COOLIFY_APP_ID"]):
+            environment = "production"
 
-    reload = environment == "development"
+        reload = environment == "development"
 
     print("🚀 Starting Qwen2.5-VL OCR Server")
     print("=" * 40)
@@ -48,4 +49,9 @@ if __name__ == "__main__":
         print("\n👋 Server stopped")
     except Exception as e:
         print(f"❌ Server failed to start: {e}")
+        sys.exit(1)
+    except Exception as startup_error:
+        print(f"❌ Startup configuration failed: {startup_error}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
