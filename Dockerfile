@@ -1,3 +1,4 @@
+
 # Lightweight OCR system for cloud deployment
 FROM python:3.11-slim
 
