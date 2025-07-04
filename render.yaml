@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: qwen-ocr-system
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8001
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: TRANSFORMERS_CACHE
+        value: /app/.cache
+      - key: HF_HOME
+        value: /app/.cache
+    disk:
+      name: model-cache
+      mountPath: /app/.cache
+      sizeGB: 10

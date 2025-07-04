@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  qwen-ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TRANSFORMERS_CACHE=/app/.cache
+      - HF_HOME=/app/.cache
+    volumes:
+      # Persistent model cache
+      - model_cache:/app/.cache
+      # Persistent uploads
+      - uploads:/app/uploads
+      # Persistent training data
+      - training_data:/app/training_data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+volumes:
+  model_cache:
+  uploads:
+  training_data:
