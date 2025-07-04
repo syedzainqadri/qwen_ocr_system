@@ -16,16 +16,40 @@ logger = logging.getLogger(__name__)
 # Check for dependencies
 try:
     import torch
-    from transformers import AutoTokenizer, AutoProcessor
+    from transformers import AutoTokenizer, AutoProcessor, AutoModelForVision2Seq
     from PIL import Image
+    import transformers
 
-    # Try to import the correct Qwen2.5-VL model class
+    # Check transformers version for compatibility
+    transformers_version = transformers.__version__
+    logger.info(f"🔧 Transformers version: {transformers_version}")
+
+    # Try to import the correct Qwen model class with multiple fallbacks
+    QwenModel = None
+    model_approach = None
+
+    # Approach 1: Try Qwen2_5_VLForConditionalGeneration (newest)
     try:
         from transformers import Qwen2_5_VLForConditionalGeneration as QwenModel
+        model_approach = "qwen2_5_vl_specific"
         logger.info("✅ Using Qwen2_5_VLForConditionalGeneration")
     except ImportError:
-        from transformers import Qwen2VLForConditionalGeneration as QwenModel
-        logger.info("✅ Using Qwen2VLForConditionalGeneration (fallback)")
+        pass
+
+    # Approach 2: Try Qwen2VLForConditionalGeneration (older)
+    if QwenModel is None:
+        try:
+            from transformers import Qwen2VLForConditionalGeneration as QwenModel
+            model_approach = "qwen2_vl_specific"
+            logger.info("✅ Using Qwen2VLForConditionalGeneration (fallback)")
+        except ImportError:
+            pass
+
+    # Approach 3: Use AutoModelForVision2Seq (most compatible)
+    if QwenModel is None:
+        QwenModel = AutoModelForVision2Seq
+        model_approach = "auto_vision2seq"
+        logger.info("✅ Using AutoModelForVision2Seq (universal fallback)")
 
     TRANSFORMERS_AVAILABLE = True
     logger.info("✅ All dependencies available")
@@ -46,16 +70,18 @@ class WorkingQwenOCR:
         self.tokenizer = None
         self.processor = None
         self.model_loaded = False
-        
+        self.model_approach = model_approach  # Store the approach being used
+
         # Use CPU for better compatibility (MPS has Conv3D issues with Qwen)
         self.device = torch.device("cpu")
         if torch.backends.mps.is_available():
             logger.info("🍎 MPS available but using CPU for Qwen compatibility")
-        
+
         logger.info(f"🤖 Working Qwen OCR Engine initialized")
         logger.info(f"📱 Device: {self.device}")
         logger.info(f"⏰ Timeout: {self.timeout}s")
         logger.info(f"🎯 Model: {self.model_name}")
+        logger.info(f"🔧 Model Approach: {self.model_approach}")
     
     def load_model(self, progress_callback: Optional[Callable] = None):
         """Load the Qwen2-VL model using the working approach."""
@@ -76,27 +102,58 @@ class WorkingQwenOCR:
             if progress_callback:
                 progress_callback("Loading model with device_map=auto...", 30)
             
-            # Try the working approach first, fallback if accelerate issues
-            try:
-                # Working approach with device_map="auto"
-                self.model = QwenModel.from_pretrained(
-                    self.model_name,
-                    torch_dtype=torch.float16,  # Use float16 for better performance
-                    device_map="auto",          # Let transformers handle device mapping
-                    offload_buffers=True        # Better memory management
-                )
-                logger.info("✅ Model loaded with device_map='auto'")
-            except Exception as e:
-                logger.warning(f"⚠️ device_map='auto' failed: {e}")
-                logger.info("🔄 Trying fallback approach...")
+            # Try different loading approaches based on environment compatibility
+            model_loaded = False
 
-                # Fallback approach without device_map
-                self.model = QwenModel.from_pretrained(
-                    self.model_name,
-                    torch_dtype=torch.float16,
-                    low_cpu_mem_usage=True
-                ).to(self.device)
-                logger.info("✅ Model loaded with fallback approach")
+            # Approach 1: Try with device_map="auto" (best performance)
+            if not model_loaded:
+                try:
+                    logger.info("🔄 Trying device_map='auto' approach...")
+                    self.model = QwenModel.from_pretrained(
+                        self.model_name,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        offload_buffers=True,
+                        trust_remote_code=True
+                    )
+                    logger.info("✅ Model loaded with device_map='auto'")
+                    model_loaded = True
+                except Exception as e:
+                    logger.warning(f"⚠️ device_map='auto' failed: {e}")
+
+            # Approach 2: Try without device_map (more compatible)
+            if not model_loaded:
+                try:
+                    logger.info("🔄 Trying manual device assignment...")
+                    self.model = QwenModel.from_pretrained(
+                        self.model_name,
+                        torch_dtype=torch.float16,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True
+                    ).to(self.device)
+                    logger.info("✅ Model loaded with manual device assignment")
+                    model_loaded = True
+                except Exception as e:
+                    logger.warning(f"⚠️ Manual device assignment failed: {e}")
+
+            # Approach 3: Try with float32 (most compatible)
+            if not model_loaded:
+                try:
+                    logger.info("🔄 Trying float32 for maximum compatibility...")
+                    self.model = QwenModel.from_pretrained(
+                        self.model_name,
+                        torch_dtype=torch.float32,
+                        low_cpu_mem_usage=True,
+                        trust_remote_code=True
+                    ).to(self.device)
+                    logger.info("✅ Model loaded with float32 compatibility mode")
+                    model_loaded = True
+                except Exception as e:
+                    logger.error(f"❌ All model loading approaches failed: {e}")
+                    raise e
+
+            if not model_loaded:
+                raise Exception("Failed to load model with any approach")
             
             logger.info("✅ Model loaded successfully")
             

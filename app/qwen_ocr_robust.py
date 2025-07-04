@@ -18,8 +18,21 @@ logger = logging.getLogger(__name__)
 try:
     import torch
     from transformers import AutoProcessor, AutoModelForVision2Seq
-    from qwen_vl_utils import process_vision_info
     from PIL import Image
+    import transformers
+
+    # Check transformers version
+    logger.info(f"🔧 Transformers version: {transformers.__version__}")
+
+    # Try to import qwen_vl_utils (may not be available in all environments)
+    try:
+        from qwen_vl_utils import process_vision_info
+        QWEN_VL_UTILS_AVAILABLE = True
+        logger.info("✅ qwen_vl_utils available")
+    except ImportError:
+        QWEN_VL_UTILS_AVAILABLE = False
+        logger.warning("⚠️ qwen_vl_utils not available - using fallback approach")
+
     TRANSFORMERS_AVAILABLE = True
     logger.info("✅ All dependencies available")
 except ImportError as e:
@@ -74,17 +87,55 @@ class RobustQwenOCR:
             )
             logger.info("✅ Processor loaded")
             
-            # Load model
+            # Load model with multiple fallback approaches for compatibility
             if progress_callback:
                 progress_callback("Loading vision-language model...", 40)
-            
-            self.model = AutoModelForVision2Seq.from_pretrained(
-                self.model_name,
-                torch_dtype=torch.float32,
-                trust_remote_code=True,
-                low_cpu_mem_usage=True
-            ).to(self.device)
-            
+
+            model_loaded = False
+
+            # Try different loading approaches for maximum compatibility
+            loading_approaches = [
+                {
+                    "name": "AutoModelForVision2Seq with float32",
+                    "kwargs": {
+                        "torch_dtype": torch.float32,
+                        "trust_remote_code": True,
+                        "low_cpu_mem_usage": True
+                    }
+                },
+                {
+                    "name": "AutoModelForVision2Seq with float16",
+                    "kwargs": {
+                        "torch_dtype": torch.float16,
+                        "trust_remote_code": True,
+                        "low_cpu_mem_usage": True
+                    }
+                },
+                {
+                    "name": "AutoModelForVision2Seq basic",
+                    "kwargs": {
+                        "trust_remote_code": True
+                    }
+                }
+            ]
+
+            for approach in loading_approaches:
+                if model_loaded:
+                    break
+                try:
+                    logger.info(f"🔄 Trying {approach['name']}...")
+                    self.model = AutoModelForVision2Seq.from_pretrained(
+                        self.model_name,
+                        **approach['kwargs']
+                    ).to(self.device)
+                    logger.info(f"✅ Model loaded with {approach['name']}")
+                    model_loaded = True
+                except Exception as e:
+                    logger.warning(f"⚠️ {approach['name']} failed: {e}")
+
+            if not model_loaded:
+                raise Exception("Failed to load model with any approach")
+
             logger.info("✅ Model loaded successfully")
             
             if progress_callback:
@@ -156,33 +207,48 @@ class RobustQwenOCR:
             except Exception as e:
                 return self._create_error_response(f"Failed to load image: {e}", start_time)
             
-            # Create message format
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "image": image_path},
-                        {"type": "text", "text": self._create_ocr_prompt(language)},
-                    ],
-                }
-            ]
-            
-            # Apply chat template
-            text_prompt = self.processor.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            
-            # Process vision info
-            image_inputs, video_inputs = process_vision_info(messages)
-            
-            # Process inputs
-            inputs = self.processor(
-                text=[text_prompt],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-            ).to(self.device)
+            # Create message format and process inputs with fallback approaches
+            if QWEN_VL_UTILS_AVAILABLE:
+                # Use qwen_vl_utils approach (preferred)
+                logger.info("🔄 Using qwen_vl_utils approach")
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "image": image_path},
+                            {"type": "text", "text": self._create_ocr_prompt(language)},
+                        ],
+                    }
+                ]
+
+                # Apply chat template
+                text_prompt = self.processor.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+
+                # Process vision info
+                image_inputs, video_inputs = process_vision_info(messages)
+
+                # Process inputs
+                inputs = self.processor(
+                    text=[text_prompt],
+                    images=image_inputs,
+                    videos=video_inputs,
+                    padding=True,
+                    return_tensors="pt",
+                ).to(self.device)
+            else:
+                # Fallback approach without qwen_vl_utils
+                logger.info("🔄 Using fallback approach (no qwen_vl_utils)")
+                prompt = self._create_ocr_prompt(language)
+
+                # Simple approach - process image and text directly
+                inputs = self.processor(
+                    text=prompt,
+                    images=image,
+                    return_tensors="pt",
+                    padding=True
+                ).to(self.device)
             
             if progress_callback:
                 progress_callback("Generating text (with timeout protection)...", 80)
