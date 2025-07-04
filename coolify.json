@@ -1,0 +1,43 @@
+{
+  "name": "qwen-ocr-system",
+  "description": "Powerful OCR system with Qwen2.5-VL-3B and PaddleOCR",
+  "type": "docker",
+  "dockerfile": "Dockerfile",
+  "port": 8001,
+  "environment": {
+    "PORT": "8001",
+    "ENVIRONMENT": "production",
+    "PYTHONUNBUFFERED": "1",
+    "TRANSFORMERS_CACHE": "/app/.cache",
+    "HF_HOME": "/app/.cache"
+  },
+  "volumes": [
+    {
+      "source": "model_cache",
+      "target": "/app/.cache",
+      "type": "volume"
+    },
+    {
+      "source": "uploads",
+      "target": "/app/uploads",
+      "type": "volume"
+    },
+    {
+      "source": "training_data",
+      "target": "/app/training_data",
+      "type": "volume"
+    }
+  ],
+  "healthcheck": {
+    "test": ["CMD", "curl", "-f", "http://localhost:8001/health"],
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 3,
+    "start_period": "60s"
+  },
+  "resources": {
+    "memory": "4Gi",
+    "cpu": "2"
+  },
+  "restart_policy": "unless-stopped"
+}
