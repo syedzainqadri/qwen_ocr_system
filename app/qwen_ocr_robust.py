@@ -48,19 +48,29 @@ class RobustQwenOCR:
     Robust Qwen2.5-VL OCR Engine with timeout handling
     Gracefully handles M1 Pro text generation hanging
     """
-    
+
     def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", timeout: int = 30):
+        # Model compatibility fallback list (Linux-compatible variants)
+        self.model_candidates = [
+            "Qwen/Qwen-VL-Chat",           # Most compatible (recommended for Linux)
+            "Qwen/Qwen2-VL-7B-Instruct",   # Newer variant
+            "Qwen/Qwen2-VL-2B-Instruct",   # Smaller variant
+            "Qwen/Qwen2.5-VL-3B-Instruct", # Original (may not work on older transformers)
+        ]
+
         self.model_name = model_name
+        self.actual_model_used = None  # Track which model actually loaded
         self.device = "cpu"  # Force CPU for M1 Pro stability
         self.timeout = timeout  # Timeout for text generation
         self.model = None
         self.processor = None
         self.model_loaded = False
-        
+
         logger.info(f"🛡️  Robust Qwen OCR Engine initialized")
         logger.info(f"📱 Device: {self.device}")
         logger.info(f"⏰ Timeout: {self.timeout}s")
-        logger.info(f"🎯 Model: {self.model_name}")
+        logger.info(f"🎯 Primary Model: {self.model_name}")
+        logger.info(f"🔄 Fallback Models: {self.model_candidates[1:]}")
     
     def load_model(self, progress_callback: Optional[Callable] = None):
         """Load the Qwen2.5-VL model and processor."""
@@ -71,22 +81,45 @@ class RobustQwenOCR:
             logger.error("❌ Transformers not available")
             return False
         
+        # Try loading different models for compatibility
+        model_loaded = False
+
+        for model_candidate in self.model_candidates:
+            if model_loaded:
+                break
+
+            try:
+                if progress_callback:
+                    progress_callback(f"Trying model: {model_candidate}...", 10)
+
+                logger.info(f"📥 Trying to load model: {model_candidate}")
+
+                # Load processor first to test model compatibility
+                if progress_callback:
+                    progress_callback("Loading processor...", 20)
+
+                test_processor = AutoProcessor.from_pretrained(
+                    model_candidate,
+                    trust_remote_code=True
+                )
+                logger.info(f"✅ Processor loaded for {model_candidate}")
+
+                # If processor loads successfully, try the model
+                self.model_name = model_candidate
+                self.actual_model_used = model_candidate
+                self.processor = test_processor
+                model_loaded = True
+
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load {model_candidate}: {e}")
+                continue
+
+        if not model_loaded:
+            raise Exception(f"Failed to load any compatible model from: {self.model_candidates}")
+
+        logger.info(f"✅ Using compatible model: {self.actual_model_used}")
+
         try:
-            if progress_callback:
-                progress_callback("Loading Qwen2.5-VL model...", 10)
-            
-            logger.info(f"📥 Loading model: {self.model_name}")
-            
-            # Load processor
-            if progress_callback:
-                progress_callback("Loading processor...", 20)
-            
-            self.processor = AutoProcessor.from_pretrained(
-                self.model_name,
-                trust_remote_code=True
-            )
-            logger.info("✅ Processor loaded")
-            
             # Load model with multiple fallback approaches for compatibility
             if progress_callback:
                 progress_callback("Loading vision-language model...", 40)

@@ -63,8 +63,24 @@ class WorkingQwenOCR:
     Uses the approach that actually works without hanging on M1 Pro
     """
     
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", timeout: int = 600):
+    def __init__(self, model_name: str = "Qwen/Qwen-VL-Chat", timeout: int = 600):
+        # Model compatibility fallback list
+        self.model_candidates = [
+            "Qwen/Qwen2.5-VL-3B-Instruct",  # Preferred (newest)
+            "Qwen/Qwen2-VL-7B-Instruct",    # Fallback (older, more compatible)
+            "Qwen/Qwen2-VL-2B-Instruct",    # Smaller fallback
+        ]
+
+        # Model compatibility fallback list (Linux-compatible variants)
+        self.model_candidates = [
+            "Qwen/Qwen-VL-Chat",           # Most compatible (recommended for Linux)
+            "Qwen/Qwen2-VL-7B-Instruct",   # Newer variant
+            "Qwen/Qwen2-VL-2B-Instruct",   # Smaller variant
+            "Qwen/Qwen2.5-VL-3B-Instruct", # Original (may not work on older transformers)
+        ]
+
         self.model_name = model_name
+        self.actual_model_used = None  # Track which model actually loaded
         self.timeout = timeout
         self.model = None
         self.tokenizer = None
@@ -80,7 +96,8 @@ class WorkingQwenOCR:
         logger.info(f"🤖 Working Qwen OCR Engine initialized")
         logger.info(f"📱 Device: {self.device}")
         logger.info(f"⏰ Timeout: {self.timeout}s")
-        logger.info(f"🎯 Model: {self.model_name}")
+        logger.info(f"🎯 Primary Model: {self.model_name}")
+        logger.info(f"🔄 Fallback Models: {self.model_candidates[1:]}")
         logger.info(f"🔧 Model Approach: {self.model_approach}")
     
     def load_model(self, progress_callback: Optional[Callable] = None):
@@ -94,9 +111,36 @@ class WorkingQwenOCR:
         
         try:
             if progress_callback:
-                progress_callback("Loading Qwen2-VL model (working approach)...", 10)
-            
-            logger.info(f"📥 Loading model: {self.model_name}")
+                progress_callback("Finding compatible Qwen model...", 10)
+
+            # Try different models for Linux compatibility
+            model_loaded = False
+
+            for model_candidate in self.model_candidates:
+                if model_loaded:
+                    break
+
+                try:
+                    logger.info(f"📥 Trying model: {model_candidate}")
+
+                    # Test processor loading first (quick compatibility check)
+                    test_processor = AutoProcessor.from_pretrained(model_candidate)
+
+                    # If processor loads, use this model
+                    self.model_name = model_candidate
+                    self.actual_model_used = model_candidate
+                    model_loaded = True
+                    logger.info(f"✅ Compatible model found: {model_candidate}")
+                    break
+
+                except Exception as e:
+                    logger.warning(f"⚠️ Model {model_candidate} not compatible: {e}")
+                    continue
+
+            if not model_loaded:
+                raise Exception(f"No compatible Qwen model found from: {self.model_candidates}")
+
+            logger.info(f"📥 Loading model: {self.actual_model_used}")
             
             # Load model with working configuration
             if progress_callback:
@@ -110,7 +154,7 @@ class WorkingQwenOCR:
                 try:
                     logger.info("🔄 Trying device_map='auto' approach...")
                     self.model = QwenModel.from_pretrained(
-                        self.model_name,
+                        self.actual_model_used,  # Use the compatible model
                         torch_dtype=torch.float16,
                         device_map="auto",
                         offload_buffers=True,
@@ -126,7 +170,7 @@ class WorkingQwenOCR:
                 try:
                     logger.info("🔄 Trying manual device assignment...")
                     self.model = QwenModel.from_pretrained(
-                        self.model_name,
+                        self.actual_model_used,  # Use the compatible model
                         torch_dtype=torch.float16,
                         low_cpu_mem_usage=True,
                         trust_remote_code=True
@@ -141,7 +185,7 @@ class WorkingQwenOCR:
                 try:
                     logger.info("🔄 Trying float32 for maximum compatibility...")
                     self.model = QwenModel.from_pretrained(
-                        self.model_name,
+                        self.actual_model_used,  # Use the compatible model
                         torch_dtype=torch.float32,
                         low_cpu_mem_usage=True,
                         trust_remote_code=True
@@ -160,15 +204,15 @@ class WorkingQwenOCR:
             # Load tokenizer
             if progress_callback:
                 progress_callback("Loading tokenizer...", 60)
-            
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+
+            self.tokenizer = AutoTokenizer.from_pretrained(self.actual_model_used)
             logger.info("✅ Tokenizer loaded")
-            
+
             # Load processor
             if progress_callback:
                 progress_callback("Loading processor...", 80)
-            
-            self.processor = AutoProcessor.from_pretrained(self.model_name)
+
+            self.processor = AutoProcessor.from_pretrained(self.actual_model_used)
             logger.info("✅ Processor loaded")
             
             if progress_callback:
@@ -332,7 +376,7 @@ class WorkingQwenOCR:
                 "text": extracted_text,
                 "confidence": 92.0,  # High confidence for working approach
                 "language": language,
-                "engine": "Qwen2.5-VL-3B-Instruct (Working)",
+                "engine": f"{self.actual_model_used} (Working)",
                 "word_count": len(extracted_text.split()) if extracted_text else 0,
                 "processing_time": processing_time,
                 "model_name": self.model_name,
