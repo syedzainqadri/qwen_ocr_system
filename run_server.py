@@ -23,20 +23,20 @@ if __name__ == "__main__":
 
         reload = environment == "development"
 
-    print("🚀 Starting Qwen2.5-VL OCR Server")
-    print("=" * 40)
-    print("🎯 Primary Engine: Qwen2.5-VL-3B-Instruct")
-    print("🔄 Fallback Engine: PaddleOCR (trainable & accurate)")
-    print(f"🌐 Environment: {environment}")
-    print(f"🔧 Port: {port}")
-    print(f"🔄 Reload: {reload}")
-    print(f"✅ Server starting at http://0.0.0.0:{port}")
-    print(f"📚 API docs available at http://0.0.0.0:{port}/docs")
-    print(f"🌐 Web interface at http://0.0.0.0:{port}")
-    print()
-    print("🛑 Press Ctrl+C to stop the server")
+        print("🚀 Starting Qwen2.5-VL OCR Server")
+        print("=" * 40)
+        print("🎯 Primary Engine: Qwen2.5-VL-3B-Instruct")
+        print("🔄 Fallback Engine: PaddleOCR (trainable & accurate)")
+        print(f"🌐 Environment: {environment}")
+        print(f"🔧 Port: {port}")
+        print(f"🔄 Reload: {reload}")
+        print(f"✅ Server starting at http://0.0.0.0:{port}")
+        print(f"📚 API docs available at http://0.0.0.0:{port}/docs")
+        print(f"🌐 Web interface at http://0.0.0.0:{port}")
+        print()
+        print("🛑 Press Ctrl+C to stop the server")
 
-    try:
+        # Run the server
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
@@ -49,9 +49,6 @@ if __name__ == "__main__":
         print("\n👋 Server stopped")
     except Exception as e:
         print(f"❌ Server failed to start: {e}")
-        sys.exit(1)
-    except Exception as startup_error:
-        print(f"❌ Startup configuration failed: {startup_error}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
