@@ -36,7 +36,7 @@ if __name__ == "__main__":
         print()
         print("🛑 Press Ctrl+C to stop the server")
 
-        # Run the server with more robust settings
+        # Run the server with production-optimized settings
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
@@ -44,8 +44,10 @@ if __name__ == "__main__":
             reload=False,  # Force disable reload in production
             log_level="info",
             workers=1,  # Single worker for model consistency
-            timeout_keep_alive=30,  # Keep connections alive longer
-            access_log=True
+            timeout_keep_alive=60,  # Longer keep alive
+            access_log=False,  # Disable access logs to reduce noise
+            server_header=False,  # Disable server header
+            date_header=False  # Disable date header
         )
     except KeyboardInterrupt:
         print("\n👋 Server stopped")

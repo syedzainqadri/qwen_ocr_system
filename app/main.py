@@ -23,8 +23,15 @@ except Exception as e:
 
 from .paddle_ocr import PaddleOCREngine
 
-# Initialize OCR engines
-paddle_ocr = PaddleOCREngine(use_angle_cls=True, lang='en')
+# Initialize OCR engines (lazy loading to prevent startup issues)
+paddle_ocr = None
+
+def get_paddle_ocr():
+    """Get PaddleOCR instance with lazy loading."""
+    global paddle_ocr
+    if paddle_ocr is None:
+        paddle_ocr = PaddleOCREngine(use_angle_cls=True, lang='en')
+    return paddle_ocr
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -665,15 +672,16 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/")
+async def root():
+    """Root endpoint - responds immediately."""
+    return {"message": "Qwen OCR System", "status": "running"}
+
+@app.get("/health")
 async def health_check():
     """Health check endpoint - responds immediately."""
-    # Simple health check that doesn't wait for models to load
-    return HealthResponse(
-        status="healthy",
-        model_loaded=True,  # Always return true for basic health
-        device="cpu"
-    )
+    # Ultra-simple health check for Coolify
+    return {"status": "healthy"}
 
 @app.post("/ocr", response_model=OCRResponse)
 async def extract_text(
@@ -735,7 +743,8 @@ async def extract_text(
         if model == "paddle":
             logger.info("User selected: PaddleOCR only")
             try:
-                result = paddle_ocr.extract_text(str(file_path), language, progress_callback)
+                paddle_engine = get_paddle_ocr()
+                result = paddle_engine.extract_text(str(file_path), language, progress_callback)
             except Exception as e:
                 logger.error(f"PaddleOCR failed: {e}")
                 result = {"success": False, "error": str(e), "text": "", "confidence": 0.0}
@@ -755,7 +764,8 @@ async def extract_text(
             # Use Qwen2.5-VL-3B as primary OCR engine, PaddleOCR as fallback
             if robust_qwen_ocr is None:
                 logger.info("Qwen2.5-VL not available, using PaddleOCR only...")
-                result = paddle_ocr.extract_text(str(file_path), language, progress_callback)
+                paddle_engine = get_paddle_ocr()
+                result = paddle_engine.extract_text(str(file_path), language, progress_callback)
             else:
                 try:
                     logger.info("Trying Qwen2.5-VL-3B first (with timeout protection)...")
@@ -770,7 +780,8 @@ async def extract_text(
                             logger.info("Qwen2.5-VL failed, falling back to PaddleOCR...")
 
                         try:
-                            paddle_result = paddle_ocr.extract_text(str(file_path), language, progress_callback)
+                            paddle_engine = get_paddle_ocr()
+                            paddle_result = paddle_engine.extract_text(str(file_path), language, progress_callback)
                             if paddle_result.get("success", True):
                                 result = paddle_result
                                 logger.info("PaddleOCR fallback successful")
@@ -783,7 +794,8 @@ async def extract_text(
                     # Fallback to PaddleOCR
                     try:
                         logger.info("Falling back to PaddleOCR due to Qwen error...")
-                        result = paddle_ocr.extract_text(str(file_path), language, progress_callback)
+                        paddle_engine = get_paddle_ocr()
+                        result = paddle_engine.extract_text(str(file_path), language, progress_callback)
                     except Exception as paddle_error:
                         logger.error(f"Both engines failed. Qwen: {e}, PaddleOCR: {paddle_error}")
                         result = {
