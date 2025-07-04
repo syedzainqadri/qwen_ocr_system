@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import asyncio
 import json as json_lib
 
-from .qwen_ocr import qwen_ocr
+from .qwen_ocr_robust import robust_qwen_ocr
 from .paddle_ocr import PaddleOCREngine
 
 # Initialize OCR engines
@@ -665,8 +665,8 @@ async def health_check():
     """Health check endpoint."""
     return HealthResponse(
         status="healthy",
-        model_loaded=qwen_ocr.is_available(),
-        device=qwen_ocr.device
+        model_loaded=robust_qwen_ocr is not None and robust_qwen_ocr.model_loaded,
+        device=robust_qwen_ocr.device if robust_qwen_ocr else "unavailable"
     )
 
 @app.post("/ocr", response_model=OCRResponse)
@@ -734,9 +734,9 @@ async def extract_text(
                 logger.error(f"PaddleOCR failed: {e}")
                 result = {"success": False, "error": str(e), "text": "", "confidence": 0.0}
         elif model == "qwen":
-            logger.info("User selected: Qwen2.5-VL only")
+            logger.info("User selected: Qwen2.5-VL only (with timeout protection)")
             try:
-                result = qwen_ocr.extract_text(str(file_path), language, progress_callback)
+                result = robust_qwen_ocr.extract_text(str(file_path), language, progress_callback)
             except Exception as e:
                 logger.error(f"Qwen2.5-VL failed: {e}")
                 result = {"success": False, "error": str(e), "text": "", "confidence": 0.0}
@@ -744,12 +744,17 @@ async def extract_text(
             logger.info("Auto mode: Qwen2.5-VL → PaddleOCR fallback")
             # Use Qwen2.5-VL-3B as primary OCR engine, PaddleOCR as fallback
             try:
-                logger.info("Trying Qwen2.5-VL-3B first...")
-                result = qwen_ocr.extract_text(str(file_path), language, progress_callback)
+                logger.info("Trying Qwen2.5-VL-3B first (with timeout protection)...")
+                result = robust_qwen_ocr.extract_text(str(file_path), language, progress_callback)
 
-                # If Qwen is in demo mode or fails, fallback to PaddleOCR
-                if result.get("demo_mode") or result.get("error") or not result.get("success", True):
-                    logger.info("Qwen2.5-VL unavailable, falling back to PaddleOCR...")
+                # If Qwen times out, has errors, or fails, fallback to PaddleOCR
+                if (result.get("timeout_occurred") or result.get("error") or
+                    not result.get("success", True)):
+                    if result.get("timeout_occurred"):
+                        logger.info("Qwen2.5-VL timed out, falling back to PaddleOCR...")
+                    else:
+                        logger.info("Qwen2.5-VL failed, falling back to PaddleOCR...")
+
                     try:
                         paddle_result = paddle_ocr.extract_text(str(file_path), language, progress_callback)
                         if paddle_result.get("success", True):
@@ -757,7 +762,7 @@ async def extract_text(
                             logger.info("PaddleOCR fallback successful")
                     except Exception as paddle_error:
                         logger.warning(f"PaddleOCR fallback also failed: {paddle_error}")
-                        # Continue with Qwen result even if it's demo mode
+                        # Continue with Qwen result (which includes timeout info)
 
             except Exception as e:
                 logger.error(f"Qwen2.5-VL failed: {e}")
