@@ -36,14 +36,16 @@ if __name__ == "__main__":
         print()
         print("🛑 Press Ctrl+C to stop the server")
 
-        # Run the server
+        # Run the server with more robust settings
         uvicorn.run(
             "app.main:app",
             host="0.0.0.0",
             port=port,
-            reload=reload,
+            reload=False,  # Force disable reload in production
             log_level="info",
-            workers=1  # Single worker for model consistency
+            workers=1,  # Single worker for model consistency
+            timeout_keep_alive=30,  # Keep connections alive longer
+            access_log=True
         )
     except KeyboardInterrupt:
         print("\n👋 Server stopped")
