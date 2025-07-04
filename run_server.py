@@ -10,10 +10,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
     # Get port from environment (for cloud deployment)
+    # Coolify and other platforms may set PORT to different values
     port = int(os.getenv("PORT", 8001))
 
-    # Disable reload in production
-    environment = os.getenv("ENVIRONMENT", "development")
+    # Detect environment more reliably
+    environment = os.getenv("ENVIRONMENT", "production")  # Default to production
+    # Also check for common cloud environment indicators
+    if any(os.getenv(var) for var in ["RAILWAY_ENVIRONMENT", "RENDER", "HEROKU_APP_NAME", "COOLIFY_APP_ID"]):
+        environment = "production"
+
     reload = environment == "development"
 
     print("🚀 Starting Qwen2.5-VL OCR Server")

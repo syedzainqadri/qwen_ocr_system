@@ -5,7 +5,6 @@
   "dockerfile": "Dockerfile",
   "port": 8001,
   "environment": {
-    "PORT": "8001",
     "ENVIRONMENT": "production",
     "PYTHONUNBUFFERED": "1",
     "TRANSFORMERS_CACHE": "/app/.cache",

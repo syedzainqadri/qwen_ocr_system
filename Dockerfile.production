@@ -1,0 +1,54 @@
+# Production-optimized Dockerfile for Qwen OCR System
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ENVIRONMENT=production
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libgomp1 \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies with explicit NumPy version control
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir "numpy==1.24.4" && \
+    pip install --no-cache-dir --no-deps torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir transformers==4.45.0 accelerate==0.24.1 && \
+    pip install --no-cache-dir qwen-vl-utils && \
+    pip install --no-cache-dir paddlepaddle==2.5.2 paddleocr==2.7.3 && \
+    pip install --no-cache-dir fastapi==0.104.1 uvicorn[standard]==0.24.0 python-multipart==0.0.6 && \
+    pip install --no-cache-dir aiofiles>=23.2.0 websockets>=12.0 && \
+    pip install --no-cache-dir opencv-python-headless>=4.8.0 pillow==10.0.0 && \
+    pip install --no-cache-dir requests>=2.31.0 jinja2>=3.1.0 typing-extensions>=4.8.0
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p uploads static logs training_data/.cache
+
+# Set permissions
+RUN chmod +x run_server.py
+
+# Expose port (will be overridden by cloud platform)
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8001}/health || exit 1
+
+# Run the application
+CMD ["python", "run_server.py"]
