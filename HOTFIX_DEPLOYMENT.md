@@ -8,9 +8,9 @@ From the Coolify logs, we identified these problems:
    - Error: "A module that was compiled using NumPy 1.x cannot be run in NumPy 2.3.1"
    - **Fix**: Pin NumPy to version <2.0.0
 
-2. **❌ Wrong Port Detection**:
-   - Coolify set PORT=3000, but app expects 8001
-   - **Fix**: Make port handling more flexible
+2. **❌ Port Mismatch**:
+   - Coolify assigns dynamic ports (like 3000), but health checks used fixed port 8001
+   - **Fix**: Make port handling flexible and update health checks
 
 3. **❌ Environment Detection**:
    - App detected "development" instead of "production"
@@ -36,13 +36,19 @@ RUN pip install --no-cache-dir "numpy<2.0.0,>=1.24.0" && \
 
 **Updated run_server.py**:
 ```python
-# Accept any port from environment
-port = int(os.getenv("PORT", 8001))
+# Accept any port from environment (default to 3030 instead of 8001)
+port = int(os.getenv("PORT", 3030))
 
 # Better environment detection
 environment = os.getenv("ENVIRONMENT", "production")  # Default to production
 if any(os.getenv(var) for var in ["RAILWAY_ENVIRONMENT", "RENDER", "HEROKU_APP_NAME", "COOLIFY_APP_ID"]):
     environment = "production"
+```
+
+**Updated Health Checks**:
+```bash
+# Flexible health check script
+./healthcheck.sh  # Uses PORT environment variable
 ```
 
 ### 3. Production Dockerfile
@@ -81,7 +87,7 @@ Set these in Coolify:
 ```bash
 ENVIRONMENT=production
 PYTHONUNBUFFERED=1
-# Don't set PORT - let Coolify handle it
+# Don't set PORT - let Coolify assign it dynamically
 ```
 
 ## 🧪 Testing After Fix
@@ -106,7 +112,7 @@ PYTHONUNBUFFERED=1
 ```
 🚀 Starting Qwen2.5-VL OCR Server
 🌐 Environment: production
-🔧 Port: 3000 (or assigned port)
+🔧 Port: 3000 (or whatever port Coolify assigns)
 🔄 Reload: False
 ✅ Server starting at http://0.0.0.0:3000
 INFO: Uvicorn running on http://0.0.0.0:3000

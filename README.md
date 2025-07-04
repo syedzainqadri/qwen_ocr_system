@@ -27,7 +27,7 @@ cd qwen-ocr-system
 
 # Build and run with Docker
 docker build -t qwen-ocr-system .
-docker run -p 8001:8001 qwen-ocr-system
+docker run -p 3030:3030 qwen-ocr-system
 ```
 
 ### Option 2: Local Development
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 python run_server.py
 ```
 
-Visit: http://localhost:8001
+Visit: http://localhost:3030
 
 ## 🌐 Cloud Deployment
 
@@ -53,10 +53,10 @@ Visit: http://localhost:8001
 1. **Connect Repository**: Add this GitHub repo to Coolify
 2. **Set Environment Variables**:
    ```
-   PORT=8001
    ENVIRONMENT=production
    PYTHONUNBUFFERED=1
    ```
+   (PORT will be automatically assigned by Coolify)
 3. **Deploy**: Coolify will automatically build and deploy using Docker
 
 ### Other Platforms
@@ -70,7 +70,7 @@ Visit: http://localhost:8001
 
 ### Web Interface
 
-1. Open http://localhost:8001
+1. Open http://localhost:3030
 2. Choose your OCR engine:
    - 🤖 **Qwen2.5-VL-3B**: AI-powered vision model
    - ⚡ **PaddleOCR**: Fast and reliable
@@ -83,16 +83,16 @@ Visit: http://localhost:8001
 
 ```bash
 # Health check
-curl http://localhost:8001/health
+curl http://localhost:3030/health
 
 # OCR with PaddleOCR
-curl -X POST http://localhost:8001/ocr \
+curl -X POST http://localhost:3030/ocr \
   -F "file=@image.jpg" \
   -F "language=eng" \
   -F "model=paddle"
 
 # OCR with Qwen2.5-VL
-curl -X POST http://localhost:8001/ocr \
+curl -X POST http://localhost:3030/ocr \
   -F "file=@image.jpg" \
   -F "language=eng" \
   -F "model=qwen"
@@ -103,7 +103,7 @@ curl -X POST http://localhost:8001/ocr \
 ### Environment Variables
 
 ```bash
-PORT=8001                    # Server port
+PORT=3030                    # Server port (or let cloud platform assign)
 ENVIRONMENT=production       # Environment (development/production)
 PYTHONUNBUFFERED=1          # Better logging
 TRANSFORMERS_CACHE=/app/.cache  # Model cache location
@@ -174,6 +174,12 @@ qwen_ocr_system/
 ├── DEPLOYMENT.md           # Deployment guide
 └── tests/                  # Test scripts
 ```
+
+## 📚 API Documentation
+
+Once running, visit:
+- **Swagger UI**: http://localhost:3030/docs
+- **ReDoc**: http://localhost:3030/redoc
 
 ## 🤝 Contributing
 

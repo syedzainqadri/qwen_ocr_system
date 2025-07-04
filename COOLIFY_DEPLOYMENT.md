@@ -43,12 +43,12 @@
 
 **Environment Variables**:
 ```bash
-PORT=8001
 ENVIRONMENT=production
 PYTHONUNBUFFERED=1
 TRANSFORMERS_CACHE=/app/.cache
 HF_HOME=/app/.cache
 ```
+(Note: Don't set PORT - let Coolify assign it automatically)
 
 **Resource Allocation**:
 - **Memory**: 4GB (minimum for AI models)

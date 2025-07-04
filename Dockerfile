@@ -36,12 +36,12 @@ RUN mkdir -p uploads static logs training_data
 # Set permissions
 RUN chmod +x run_server.py
 
-# Expose port
-EXPOSE 8001
+# Expose port (default to 3030, but will be overridden by cloud platform)
+EXPOSE 3030
 
-# Health check
+# Health check - use flexible script that adapts to any port
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD ./healthcheck.sh
 
 # Run the application
 CMD ["python", "run_server.py"]

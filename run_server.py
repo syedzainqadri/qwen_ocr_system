@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 if __name__ == "__main__":
     # Get port from environment (for cloud deployment)
     # Coolify and other platforms may set PORT to different values
-    port = int(os.getenv("PORT", 8001))
+    # Use 3030 as default since 8001 may not be available on some platforms
+    port = int(os.getenv("PORT", 3030))
 
     # Detect environment more reliably
     environment = os.getenv("ENVIRONMENT", "production")  # Default to production
