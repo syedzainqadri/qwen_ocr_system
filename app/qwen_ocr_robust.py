@@ -303,10 +303,6 @@ class RobustQwenOCR:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            # Generate with timeout protection
-            logger.info(f"🎯 Generating text (timeout: {self.timeout}s)...")
-            logger.info(f"💾 Memory optimization: max_tokens={generation_kwargs['max_new_tokens']}, cache=False")
-            
             # Ultra-conservative generation for cloud memory limits
             generation_kwargs = {
                 "max_new_tokens": 32,   # Reduced further to minimize memory
@@ -319,6 +315,10 @@ class RobustQwenOCR:
                 "output_attentions": False,  # Disable attention outputs
                 "output_hidden_states": False,  # Disable hidden states
             }
+
+            # Generate with timeout protection
+            logger.info(f"🎯 Generating text (timeout: {self.timeout}s)...")
+            logger.info(f"💾 Memory optimization: max_tokens={generation_kwargs['max_new_tokens']}, cache=False")
             
             generation_result = self._generate_with_timeout(inputs, generation_kwargs)
             
