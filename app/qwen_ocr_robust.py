@@ -65,12 +65,28 @@ class RobustQwenOCR:
         self.model = None
         self.processor = None
         self.model_loaded = False
+        self.memory_issues_detected = False  # Track memory problems
+
+        # Check available memory
+        try:
+            import psutil
+            available_memory_gb = psutil.virtual_memory().available / (1024**3)
+            logger.info(f"💾 Available memory: {available_memory_gb:.1f}GB")
+
+            if available_memory_gb < 8:  # Less than 8GB available
+                logger.warning(f"⚠️ Low memory detected ({available_memory_gb:.1f}GB). Qwen may fail.")
+                self.memory_issues_detected = True
+        except ImportError:
+            logger.info("💾 psutil not available, cannot check memory")
 
         logger.info(f"🛡️  Robust Qwen OCR Engine initialized")
         logger.info(f"📱 Device: {self.device}")
         logger.info(f"⏰ Timeout: {self.timeout}s")
         logger.info(f"🎯 Primary Model: {self.model_name}")
         logger.info(f"🔄 Fallback Models: {self.model_candidates[1:]}")
+
+        if self.memory_issues_detected:
+            logger.warning(f"⚠️ Memory constraints detected - recommend using PaddleOCR instead")
     
     def load_model(self, progress_callback: Optional[Callable] = None):
         """Load the Qwen2.5-VL model and processor."""

@@ -760,7 +760,7 @@ async def extract_text(
                     logger.error(f"Qwen2.5-VL failed: {e}")
                     result = {"success": False, "error": str(e), "text": "", "confidence": 0.0}
         else:  # model == "auto"
-            logger.info("Auto mode: Qwen2.5-VL → PaddleOCR fallback")
+            logger.info("Auto mode: Qwen2.5-VL → PaddleOCR fallback (memory issues detected)")
             # Use Qwen2.5-VL-3B as primary OCR engine, PaddleOCR as fallback
             if robust_qwen_ocr is None:
                 logger.info("Qwen2.5-VL not available, using PaddleOCR only...")

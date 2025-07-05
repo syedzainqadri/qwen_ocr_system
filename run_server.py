@@ -25,8 +25,8 @@ if __name__ == "__main__":
 
         print("🚀 Starting Qwen2.5-VL OCR Server")
         print("=" * 40)
-        print("🎯 Primary Engine: Qwen2.5-VL-3B-Instruct (3B model - optimal size)")
-        print("🔄 Fallback Engine: PaddleOCR (trainable & accurate)")
+        print("🎯 Primary Engine: PaddleOCR (reliable & fast)")
+        print("🔄 Fallback Engine: Qwen2.5-VL-3B-Instruct (memory issues on cloud)")
         print(f"🌐 Environment: {environment}")
         print(f"🔧 Port: {port}")
         print(f"🔄 Reload: {reload}")
