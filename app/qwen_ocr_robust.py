@@ -51,11 +51,11 @@ class RobustQwenOCR:
 
     def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", timeout: int = 30):
         # Model compatibility fallback list (Linux-compatible variants)
+        # Prioritize Qwen2.5-VL-3B and avoid 7B models
         self.model_candidates = [
-            "Qwen/Qwen-VL-Chat",           # Most compatible (recommended for Linux)
-            "Qwen/Qwen2-VL-7B-Instruct",   # Newer variant
-            "Qwen/Qwen2-VL-2B-Instruct",   # Smaller variant
-            "Qwen/Qwen2.5-VL-3B-Instruct", # Original (may not work on older transformers)
+            "Qwen/Qwen2.5-VL-3B-Instruct", # Primary target (3B model)
+            "Qwen/Qwen-VL-Chat",           # Fallback (older but compatible)
+            # Note: Avoiding 7B models as requested - too large
         ]
 
         self.model_name = model_name

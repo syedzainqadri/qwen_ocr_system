@@ -42,9 +42,10 @@ EXPOSE 3030
 
 RUN apt-get update && apt-get install -y curl
 
-# Health check completely disabled for Coolify deployment
-# Let Coolify handle external health checks
-# HEALTHCHECK NONE
+# Health check with longer timeout for model downloads
+# Allow 10 minutes for initial model download and loading
+HEALTHCHECK --interval=60s --timeout=60s --start-period=600s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-3030}/health || exit 1
 
 # Run the application
 CMD ["python", "run_server.py"]

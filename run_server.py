@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
         print("🚀 Starting Qwen2.5-VL OCR Server")
         print("=" * 40)
-        print("🎯 Primary Engine: Qwen2.5-VL-3B-Instruct")
+        print("🎯 Primary Engine: Qwen2.5-VL-3B-Instruct (3B model - optimal size)")
         print("🔄 Fallback Engine: PaddleOCR (trainable & accurate)")
         print(f"🌐 Environment: {environment}")
         print(f"🔧 Port: {port}")
@@ -34,6 +34,7 @@ if __name__ == "__main__":
         print(f"📚 API docs available at http://0.0.0.0:{port}/docs")
         print(f"🌐 Web interface at http://0.0.0.0:{port}")
         print()
+        print("⏳ Note: First startup may take 5-10 minutes for model download")
         print("🛑 Press Ctrl+C to stop the server")
 
         # Run the server with production-optimized settings
