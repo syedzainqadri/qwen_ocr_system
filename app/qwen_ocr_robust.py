@@ -232,11 +232,22 @@ class RobustQwenOCR:
                 progress_callback("Processing image...", 70)
             
             logger.info(f"📷 Processing image: {image_path}")
-            
-            # Load image
+
+            # Load image with memory optimization
             try:
                 image = Image.open(image_path).convert("RGB")
-                logger.info(f"✅ Image loaded: {image.size}")
+                original_size = image.size
+                logger.info(f"✅ Image loaded: {original_size}")
+
+                # Resize large images to reduce memory usage (critical for cloud deployment)
+                max_dimension = 1024  # Reduce from default to save memory
+                if max(image.size) > max_dimension:
+                    # Calculate new size maintaining aspect ratio
+                    ratio = max_dimension / max(image.size)
+                    new_size = tuple(int(dim * ratio) for dim in image.size)
+                    image = image.resize(new_size, Image.LANCZOS)
+                    logger.info(f"🔄 Image resized from {original_size} to {image.size} for memory optimization")
+
             except Exception as e:
                 return self._create_error_response(f"Failed to load image: {e}", start_time)
             
@@ -286,17 +297,27 @@ class RobustQwenOCR:
             if progress_callback:
                 progress_callback("Generating text (with timeout protection)...", 80)
             
+            # Memory cleanup before generation
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
             # Generate with timeout protection
             logger.info(f"🎯 Generating text (timeout: {self.timeout}s)...")
+            logger.info(f"💾 Memory optimization: max_tokens={generation_kwargs['max_new_tokens']}, cache=False")
             
+            # Ultra-conservative generation for cloud memory limits
             generation_kwargs = {
-                "max_new_tokens": 64,   # Very conservative for M1 Pro
+                "max_new_tokens": 32,   # Reduced further to minimize memory
                 "min_new_tokens": 1,
-                "do_sample": False,
-                "num_beams": 1,
+                "do_sample": False,     # Deterministic generation
+                "num_beams": 1,         # Single beam to save memory
                 "pad_token_id": self.processor.tokenizer.eos_token_id,
                 "eos_token_id": self.processor.tokenizer.eos_token_id,
-                "use_cache": True,
+                "use_cache": False,     # Disable cache to save memory
+                "output_attentions": False,  # Disable attention outputs
+                "output_hidden_states": False,  # Disable hidden states
             }
             
             generation_result = self._generate_with_timeout(inputs, generation_kwargs)
@@ -321,7 +342,14 @@ class RobustQwenOCR:
             
             extracted_text = output.strip()
             processing_time = time.time() - start_time
-            
+
+            # Clean up memory to prevent accumulation
+            del generated_ids, response_token_ids, inputs, output
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            import gc
+            gc.collect()
+
             if progress_callback:
                 progress_callback("OCR completed!", 100)
             
